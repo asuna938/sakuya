@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Project AM - Tactical Rogue Ver.15.0</title>
+<style>
+body {
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  background-color: #06090c; color: #cdd4da; margin: 0; padding: 0; overflow: hidden; user-select: none;
+}
+/* 🏠 ホーム画面 */
+#home-screen {
+  position: absolute; top: 0; left: 0; width: 100vw; height: 100vh;
+  background: radial-gradient(circle at center, #1a2a3a 0%, #030507 100%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200;
+}
+.home-title { font-size: 36px; font-weight: bold; color: #00e5ff; letter-spacing: 6px; text-shadow: 0 0 20px rgba(0,229,255,0.6); margin-bottom: 10px; }
+.home-subtitle { font-size: 14px; color: #718096; letter-spacing: 2px; margin-bottom: 30px; }
+.stats-bar { font-size: 14px; color: #ffaa00; margin-bottom: 20px; font-weight: bold; }
+.home-menu { display: flex; flex-direction: column; gap: 12px; width: 280px; }
+.menu-btn {
+  background: rgba(11, 22, 33, 0.8); border: 2px solid #00e5ff; color: #00e5ff;
+  padding: 12px; font-size: 13px; font-weight: bold; letter-spacing: 2px; cursor: pointer; text-align: center; border-radius: 4px; transition: all 0.2s;
+}
+.menu-btn:hover { background: #00e5ff; color: #05080c; box-shadow: 0 0 15px rgba(0,229,255,0.4); }
+
+/* モーダル共通 */
+#deck-preview-overlay {
+  position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.9);
+  z-index: 250; display: none; flex-direction: column; align-items: center; justify-content: center;
+}
+.deck-grid { display: flex; flex-wrap: wrap; gap: 15px; max-width: 700px; justify-content: center; margin-top: 20px; max-height: 400px; overflow-y: auto; padding: 10px; }
+
+/* 🎮 ゲーム画面 */
+#game-container { display: flex; flex-direction: column; width: 100vw; height: 100vh; background: radial-gradient(circle at center, #14202d 0%, #030507 100%); position: relative; }
+#header { height: 45px; background: rgba(10, 15, 20, 0.9); border-bottom: 2px solid #2d3748; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; z-index: 10; }
+#game-title { font-weight: bold; letter-spacing: 2px; color: #00e5ff; text-shadow: 0 0 10px rgba(0,229,255,0.5); cursor: pointer; }
+#stage-display { font-size: 14px; font-weight: bold; color: #ff1744; }
+
+#main-area { display: flex; flex: 1; position: relative; padding: 15px; box-sizing: border-box; }
+#sidebar-left { width: 230px; display: flex; flex-direction: column; gap: 12px; z-index: 5; }
+.command-panel { background: rgba(11, 22, 33, 0.9); border: 2px solid #00e5ff; border-radius: 8px; padding: 10px; text-align: center; }
+.command-title { font-size: 11px; color: #8fa4b3; }
+.command-value { font-size: 24px; font-weight: bold; color: #00e5ff; }
+#log-panel { background: rgba(5, 8, 12, 0.95); border: 1px solid #1a2a3a; border-radius: 6px; padding: 10px; height: 320px; overflow-y: auto; font-size: 11px; color: #a0aec0; }
+
+#map-container { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; }
+#arrow-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; }
+
+.hex-cell { position: absolute; width: 80px; height: 92px; background: #2d3748; clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); cursor: pointer; transition: all 0.2s ease; }
+.hex-inner { position: absolute; top: 2px; left: 2px; right: 2px; bottom: 2px; background: #161c24; clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+
+.unit-badge { z-index: 5; padding: 4px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; line-height: 1.3; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.5); transform: scale(1); transition: transform 0.2s; }
+.unit-side-A { background: #1a365d; color: #fff; border: 1px solid #3182ce; } 
+.unit-side-B { background: #651a1a; color: #fff; border: 1px solid #e53e3e; } 
+
+.hex-cell.valid-target { background: #ff1744 !important; animation: target-pulse 0.6s infinite alternate ease-in-out; }
+.hex-cell.valid-target .hex-inner { background: #3c0711; }
+@keyframes target-pulse { from { filter: brightness(0.9); transform: scale(0.96); } to { filter: brightness(1.4); transform: scale(1.02); } }
+
+#ui-bottom { height: 160px; background: linear-gradient(to top, rgba(5, 7, 10, 0.98) 80%, rgba(15, 23, 33, 0.6) 0%); border-top: 2px solid #2d3748; display: flex; align-items: center; justify-content: space-between; padding: 0 40px; z-index: 10; }
+#hand-container { display: flex; align-items: flex-end; gap: 12px; height: 100%; padding-bottom: 10px; }
+
+.game-card { 
+  width: 115px; height: 135px; background: linear-gradient(135deg, #15222e 0%, #0b1015 100%); border: 1px solid #2a3d4e; border-radius: 4px; padding: 6px; box-sizing: border-box; 
+  display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+  animation: card-deal 0.3s ease-out both;
+}
+.game-card:hover { transform: translateY(-10px); border-color: #00e5ff; box-shadow: 0 5px 15px rgba(0,229,255,0.2); }
+.game-card.active-card { border-color: #00e5ff !important; box-shadow: 0 0 15px #00e5ff !important; transform: translateY(-15px); }
+.card-cost { background: #00e5ff; color: #05080c; width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; }
+.card-title { font-size: 10px; font-weight: bold; color: #edf2f7; text-align: center; }
+.card-desc { font-size: 9px; color: #a0aec0; text-align: center; line-height: 1.2; white-space: pre-line; }
+@keyframes card-deal { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+#btn-end-turn { background: #1a2a3a; border: 2px solid #ff1744; color: #ff1744; padding: 12px 25px; font-size: 13px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+#btn-end-turn:hover { background: #ff1744; color: #fff; box-shadow: 0 0 15px #ff1744; }
+
+/* 飾るバトル演出モーダル */
+.modal-overlay { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.85); z-index: 100; display: none; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
+.clash-window { width: 680px; height: 360px; background: #0b1015; border: 2px solid #ff1744; border-radius: 8px; display: flex; flex-direction: column; padding: 20px; box-sizing: border-box; position: relative; }
+.reward-window { width: 500px; height: 300px; background: #0b1015; border: 2px solid #00e5ff; border-radius: 8px; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+.reward-cards { display: flex; gap: 20px; margin-top: 30px; }
+
+.shake { animation: window-shake 0.3s linear infinite; }
+@keyframes window-shake {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-4px, -2px); }
+  75% { transform: translate(4px, 2px); }
+}
+
+.clash-flash { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; opacity: 0; }
+.flash-win { background: radial-gradient(circle, rgba(0,229,255,0.5) 0%, transparent 70%); animation: flash-fade 0.3s ease-out; }
+.flash-lose { background: radial-gradient(circle, rgba(255,23,68,0.6) 0%, transparent 70%); animation: flash-fade 0.3s ease-out; }
+.flash-furioso { background: radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(0,0,0,0.9) 80%); animation: flash-fade 0.2s ease-out; }
+@keyframes flash-fade { 0% { opacity: 1; } 100% { opacity: 0; } }
+
+#furioso-cutin {
+  position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) scale(0.5);
+  font-size: 48px; font-weight: bold; color: #fff; text-shadow: 0 0 20px #000;
+  letter-spacing: 12px; opacity: 0; pointer-events: none; z-index: 50; transition: all 0.3s ease-out;
+}
+#furioso-cutin.show { opacity: 1; transform: translate(-50%, -50%) scale(1); color: #ff1744; text-shadow: 0 0 30px rgba(255,23,68,0.8); }
+</style>
+</head>
+<body>
+
+<!-- 🏠 ホーム画面 -->
+<div id="home-screen">
+  <div class="home-title">PROJECT AM</div>
+  <div class="home-subtitle">50-LAYER TACTICAL CLASH TOWER</div>
+  <div class="stats-bar" id="home-stats">最高到達階: 1F</div>
+  <div class="home-menu">
+    <div class="menu-btn" onclick="startGame()">作戦開始 (第1層から進軍)</div>
+    <div class="menu-btn" onclick="openDeckPreview()">初期デッキ確認</div>
+  </div>
+</div>
+
+<!-- 🎴 デッキ確認 -->
+<div id="deck-preview-overlay" onclick="closeDeckPreview()">
+  <div style="font-size: 20px; color: #00e5ff; font-weight: bold; margin-bottom: 10px;">現在の所持カード一覧</div>
+  <div class="deck-grid" id="deck-grid-container" onclick="event.stopPropagation()"></div>
+</div>
+
+<!-- 🎮 ゲーム画面 -->
+<div id="game-container">
+  <div id="header">
+    <div id="game-title" onclick="returnToHome()">◀ MENU BACK</div>
+    <div id="stage-display">STAGE 1 / 50</div>
+  </div>
+  <div id="main-area">
+    <div id="sidebar-left">
+      <div class="command-panel">
+        <div class="command-title">光 (エネルギー)</div>
+        <div class="command-value" id="command-val">4 / 4</div>
+      </div>
+      <div id="log-panel"></div>
+    </div>
+    <div id="map-container">
+      <svg id="arrow-svg"></svg>
+      <div id="hex-map"></div>
+    </div>
+  </div>
+  <div id="ui-bottom">
+    <div id="hand-container"></div>
+    <button id="btn-end-turn" onclick="startBattlePhase()">舞台進行 (戦闘開始)</button>
+  </div>
+</div>
+
+<!-- 各種対戦・報酬用ポップアップ -->
+<div id="clash-overlay" class="modal-overlay">
+  <div class="clash-window" id="clash-window-element">
+    <div id="clash-flash-element" class="clash-flash"></div>
+    <div id="furioso-cutin">FURIOSO</div>
+    <div id="clash-type-title" style="text-align:center; font-weight:bold; color:#ff1744; letter-spacing: 1px;">CLASH !!</div>
+    <div style="display:flex; justify-content:space-between; align-items:center; flex:1; padding:10px;">
+      <div style="width:230px; text-align:center;">
+        <div id="clash-p-name" style="font-weight:bold; margin-bottom: 8px; font-size:13px;">-</div>
+        <div style="background:#1a202c; padding:10px; border-radius:6px; height:120px; border: 1px solid #2d3748; overflow-y:auto;">
+          <div id="clash-p-card-title" style="color:#63b3ed; font-size:12px; font-weight:bold;">-</div>
+          <div id="clash-p-card-desc" style="color:#a0aec0; font-size:9px; margin-top:4px; white-space:pre-line;"></div>
+          <div id="p-dice" style="font-size:24px; font-weight:bold; margin-top:5px; color: #fff;">-</div>
+        </div>
+      </div>
+      <div style="font-size:20px; color:#718096; font-weight: bold; font-style: italic;">VS</div>
+      <div style="width:230px; text-align:center;">
+        <div id="clash-e-name" style="font-weight:bold; margin-bottom: 8px; font-size:13px;">-</div>
+        <div style="background:#1a202c; padding:10px; border-radius:6px; height:120px; border: 1px solid #2d3748; overflow-y:auto;">
+          <div id="clash-e-card-title" style="color:#fc8181; font-size:12px; font-weight:bold;">-</div>
+          <div id="clash-e-card-desc" style="color:#a0aec0; font-size:9px; margin-top:4px; white-space:pre-line;"></div>
+          <div id="e-dice" style="font-size:24px; font-weight:bold; color:#ff1744; margin-top:5px;">-</div>
+        </div>
+      </div>
+    </div>
+    <button id="clash-action-btn" style="margin:auto; padding:10px 40px; background:#ff1744; color:#fff; border:none; font-weight:bold; cursor:pointer; letter-spacing:2px; box-shadow:0 0 10px rgba(255,23,68,0.4);" onclick="resolveMatch()">ダイスを振る！</button>
+  </div>
+</div>
+
+<div id="reward-overlay" class="modal-overlay"><div class="reward-window"><div style="font-size:18px; color:#00e5ff; font-weight:bold;" id="reward-title">作戦完了：カードを選択</div><div class="reward-cards" id="reward-cards-container"></div></div></div>
+
+<script>
+const mapWidth = 6;
+let currentStage = 1;
+let maxStageReached = 1;
+let currentCommand = 4;
+let selectedCardIndex = null;
+let activeMatches = [];
+
+let baseDeck = [
+  { title: "縦斬り", cost: 2, range: 2, user: "Kaito(剣士)", minDice: 4, maxDice: 10, color: "#ff4d4d", desc: "射程2 / [4-10]" },
+  { title: "防衛構え", cost: 1, range: 2, user: "Kaito(剣士)", minDice: 5, maxDice: 8, color: "#4d94ff", desc: "射程2 / [5-8]" },
+  { title: "牽制突き", cost: 1, range: 2, user: "Kaito(剣士)", minDice: 3, maxDice: 7, color: "#ff4d4d", desc: "射程2 / [3-7]" },
+  { title: "工兵の鉄槌", cost: 2, range: 1, user: "Rina(工兵)", minDice: 6, maxDice: 11, color: "#ffaa00", desc: "射程1 / [6-11]" }
+];
+let playerDeck = [];
+
+const rewardPool = [
+  { title: "九死一生の極斬", cost: 3, range: 2, user: "Kaito(剣士)", minDice: 10, maxDice: 22, color: "#e53935", desc: "超大技 / [10-22]" },
+  { title: "試作型レールガン", cost: 2, range: 4, user: "Rina(工兵)", minDice: 7, maxDice: 15, color: "#00e5ff", desc: "超長射程 / [7-15]" },
+  { title: "神速の一閃", cost: 1, range: 2, user: "Kaito(剣士)", minDice: 6, maxDice: 10, color: "#ff4d4d", desc: "低コスト高性能 / [6-10]" },
+  { title: "オーバーチャージ", cost: 0, range: 1, user: "Rina(工兵)", minDice: 4, maxDice: 8, color: "#ffaa00", desc: "[4-8] コスト0" },
+  { title: "Furioso", cost: 3, range: 2, user: "Kaito(剣士)", minDice: 3, maxDice: 7, color: "#000000", desc: "特異：9連撃乱舞\n[3-7]×9回判定", isFurioso: true }
+];
+
+let hand = [];
+let units = [];
+
+function updateHomeUI() {
+  document.getElementById("home-stats").innerText = `最高到達階: ${maxStageReached}F`;
+}
+
+function startGame() {
+  document.getElementById("home-screen").style.display = "none";
+  playerDeck = JSON.parse(JSON.stringify(baseDeck));
+  initStage(1);
+}
+
+function returnToHome() {
+  if(confirm("撤退すると現在の進捗が消失し、ホームに戻ります。よろしいですか？")) {
+    document.getElementById("home-screen").style.display = "flex";
+    updateHomeUI();
+  }
+}
+
+function generateEnemiesForStage(stage) {
+  let enemyList = [];
+  let isBoss = (stage % 10 === 0);
+  let isElite = (stage % 5 === 0 && !isBoss);
+  
+  let enemyCount = 1;
+  if (stage > 5) enemyCount = 2;
+  if (stage > 20) enemyCount = 3;
+  if (stage > 35) enemyCount = 4;
+  if (isBoss) enemyCount = 1;
+
+  let hpMultiplier = 1 + (stage * 0.25);
+
+  if (isBoss) {
+    if (stage === 10) {
+      enemyList.push({
+        id: "BOSS", x: 4, y: 2, side: "B",
+        name: `【第10層ボス】MASTER-X`,
+        hp: Math.floor(60 * hpMultiplier), maxHp: Math.floor(60 * hpMultiplier),
+        cardPool: [
+          { title: "焦熱の波動", minDice: 6, maxDice: 14, desc: "前方への熱線波" },
+          { title: "滅びの宣告", minDice: 8, maxDice: 18, desc: "必滅 of チャージレーザー" }
+        ]
+      });
+    } else if (stage === 20) {
+      enemyList.push({
+        id: "BOSS", x: 4, y: 2, side: "B",
+        name: `【第20層ボス】マティアス`,
+        hp: Math.floor(85 * hpMultiplier), maxHp: Math.floor(85 * hpMultiplier),
+        cardPool: [
+          { title: "激炎掌", minDice: 8, maxDice: 16, desc: "リウ協会4課・掌打" },
+          { title: "点火", minDice: 6, maxDice: 13, desc: "焔を纏う連撃の構え" }
+        ]
+      });
+    } else if (stage === 30) {
+      enemyList.push({
+        id: "BOSS", x: 4, y: 2, side: "B",
+        name: `【第30層ボス】ヴァレンチーナ`,
+        hp: Math.floor(110 * hpMultiplier), maxHp: Math.floor(110 * hpMultiplier),
+        cardPool: [
+          { title: "鉄拳乱舞", minDice: 10, maxDice: 19, desc: "猛烈なラッシュ攻撃" },
+          { title: "勁力", minDice: 8, maxDice: 15, desc: "内勁を叩き込む一撃" }
+        ]
+      });
+    } else if (stage === 40) {
+      enemyList.push({
+        id: "BOSS", x: 4, y: 2, side: "B",
+        name: `【第40層ボス】リアン`,
+        hp: Math.floor(135 * hpMultiplier), maxHp: Math.floor(135 * hpMultiplier),
+        cardPool: [
+          { title: "叩き下ろせ、身体を崩し", minDice: 12, maxDice: 62, desc: "暴食/打撃 [12-62]\n解禁段階に応じ最終威力上昇\n打撃武器ならダメージ+20%" },
+          { title: "先端を立てろ、芯まで押し込んで", minDice: 12, maxDice: 62, desc: "暴食/貫通 [12-62]\n解禁段階に応じ最終威力上昇\n貫通武器ならダメージ+20%" },
+          { title: "刃を寝かせろ、息が裂けるように切り取って", minDice: 12, maxDice: 62, desc: "暴食/斬撃 [12-62]\n解禁段階に応じ最終威力上昇\n斬撃武器ならダメージ+20%" },
+          { title: "振り払って落とせ、大地に平伏させて", minDice: 12, maxDice: 83, desc: "傲慢/打撃 [12-83]\n解禁Ⅱで最終コインが破壊不能化\n解禁Ⅲならマッチ勝利時混乱区間後退" },
+          { title: "一点を狙え、内側から響かせて", minDice: 12, maxDice: 83, desc: "傲慢/貫通 [12-83]\n解禁Ⅱで最終コインが破壊不能化\n解禁Ⅲならマッチ勝利時次ターン威力減少付与" },
+          { title: "刃筋を低く這わせろ、残ったものを剥ぎ取れ", minDice: 12, maxDice: 83, desc: "傲慢/斬撃 [12-83]\n解禁Ⅱで最終コインが破壊不能化\n解禁Ⅲならマッチ勝利時次ターン威力増加" },
+          { title: "!!音を砕いて、思考を平たく踏み潰せ", minDice: 13, maxDice: 154, desc: "憂鬱/打撃 [13-154] 速度無視マッチ\n打撃時ダメージ+50%\n3,4枚目破壊不能化、混乱区間後退" },
+          { title: "!!静寂の中心を突いて、記憶を貫け", minDice: 13, maxDice: 154, desc: "憂鬱/貫通 [13-154] 速度無視マッチ\n貫通時ダメージ+50%\n3,4枚目破壊不能化、次ターンダメージ増加" },
+          { title: "!!鋭く研ぎ澄ました秘密で、形を切り落とせ", minDice: 13, maxDice: 154, desc: "憂鬱/斬撃 [13-154] 速度無視マッチ\n斬撃時ダメージ+50%\n3,4枚目破壊不能化、マッチ勝利時最終威力+2" },
+          { title: "!!!Furioso-Replica", minDice: 75, maxDice: 72, desc: "憤怒/斬撃 [75-72] 広域乱射 守備無視\nマッチ威力+5、精神力0以上ならマン(望)生成\n的中時最大7回再使用判定" }
+        ]
+      });
+    } else if (stage === 50) {
+      enemyList.push({
+        id: "BOSS", x: 4, y: 2, side: "B",
+        name: `【第50層・最終守護者】レイホン`,
+        hp: Math.floor(250 * hpMultiplier), maxHp: Math.floor(250 * hpMultiplier),
+        cardPool: [
+          { title: "二連斬", minDice: 14, maxDice: 82, desc: "傲慢/斬撃\n[的中時]振動付与。火傷と振動に応じて最終威力上昇" },
+          { title: "三連撃", minDice: 13, maxDice: 93, desc: "嫉嫉/斬撃\n[的中時]振動爆発。対象の振動回数が減少" },
+          { title: "二連斬-【爆】", minDice: 14, maxDice: 102, desc: "傲慢/斬撃\n虎標弾を消耗し、火傷と振動を多量付与" },
+          { title: "三連撃-【爆】", minDice: 13, maxDice: 123, desc: "嫉妬/斬撃\n虎標弾を消耗し、2回連続で振動爆発を発生" },
+          { title: "爆砕斬", minDice: 14, maxDice: 133, desc: "暴食/斬撃\n破壊不能コイン。虎標弾消耗、振動-灼熱へ振幅変換" },
+          { title: "快刀亂麻", minDice: 1, maxDice: 38, desc: "憤怒/斬撃\n底力消耗、攻撃加重値増加、3回連続振動爆発" },
+          { title: "超絶猛虎殺撃乱斬", minDice: 3, maxDice: 73, desc: "憤怒/斬撃\n底力全消耗。6枚の破壊不能コインによる5回振動爆発" }
+        ]
+      });
+    }
+  } else {
+    let types = [
+      { name: "ディフェンダー", min: 3, max: 7, hp: 25 },
+      { name: "ストライカー", min: 4, max: 10, hp: 18 },
+      { name: "スナイパー", min: 2, max: 8, hp: 15 }
+    ];
+    for (let i = 0; i < enemyCount; i++) {
+      let t = types[Math.floor(Math.random() * types.length)];
+      let eHp = Math.floor(t.hp * hpMultiplier * (isElite ? 1.5 : 1));
+      enemyList.push({
+        id: `E${i}`, x: 4, y: 1 + i, side: "B",
+        name: `${isElite ? '【ELITE】' : ''}${t.name}-${i+1}`,
+        hp: eHp, maxHp: eHp,
+        cardPool: [{ title: "通常攻撃", minDice: t.min, maxDice: t.max, desc: "標準的な敵の攻撃" }]
+      });
+    }
+  }
+  return enemyList;
+}
+
+function initStage(stageNum) {
+  currentStage = stageNum;
+  if (currentStage > 50) {
+    alert("全50層完全踏破！！南部リウ協会4課を打ち破った最強の管理人です！");
+    document.getElementById("home-screen").style.display = "flex"; updateHomeUI(); return;
+  }
+  if (currentStage > maxStageReached) maxStageReached = currentStage;
+  document.getElementById("stage-display").innerText = `STAGE ${currentStage} / 50`;
+  
+  let maxKaito = 30;
+  let maxRina = 20;
+  let kaitoHp = stageNum === 1 ? maxKaito : Math.min(maxKaito, units.find(u => u.id === "A1")?.hp || maxKaito);
+  let rinaHp = stageNum === 1 ? maxRina : Math.min(maxRina, units.find(u => u.id === "A2")?.hp || maxRina);
+
+  units = [
+    { id: "A1", x: 1, y: 1, side: "A", name: "Kaito(剣士)", hp: kaitoHp, maxHp: maxKaito, target: null, card: null },
+    { id: "A2", x: 1, y: 3, side: "A", name: "Rina(工兵)", hp: rinaHp, maxHp: maxRina, target: null, card: null }
+  ];
+
+  let enemies = generateEnemiesForStage(currentStage);
+  enemies.forEach(e => units.push(e));
+
+  document.getElementById("log-panel").innerHTML = "<div>-- 作戦開始 --</div>";
+  logMessage(`ーー 第 ${currentStage} 層 エリア侵入 ーー`, "#00e5ff");
+  startPlayerTurn();
+}
+
+function startPlayerTurn() {
+  currentCommand = 4;
+  document.getElementById("command-val").innerText = `4 / 4`;
+  hand = [];
+  for(let i=0; i<3; i++) hand.push({ ...playerDeck[Math.floor(Math.random() * playerDeck.length)] });
+  runEnemyAI();
+  renderHand(); drawMap();
+}
+
+function runEnemyAI() {
+  let enemies = units.filter(u => u.side === "B");
+  let allies = units.filter(u => u.side === "A");
+  enemies.forEach(e => {
+    if (allies.length === 0) return;
+    let targetAlly = allies.reduce((prev, curr) => (prev.hp < curr.hp) ? prev : curr);
+    let dist = Math.max(Math.abs(e.x - targetAlly.x), Math.abs(e.y - targetAlly.y));
+    if (dist > 1) {
+      if (e.x > targetAlly.x) e.x--; else if (e.x < targetAlly.x) e.x++;
+      if (e.y > targetAlly.y) e.y--; else if (e.y < targetAlly.y) e.y++;
+    }
+    e.target = targetAlly.id; e.card = e.cardPool[Math.floor(Math.random() * e.cardPool.length)];
+  });
+}
+
+function drawMap() {
+  const mapDiv = document.getElementById("hex-map"); mapDiv.innerHTML = "";
+  const xSpacing = 74; const ySpacing = 70;
+  for (let y = 0; y < 5; y++) {
+    for (let x = 0; x < mapWidth; x++) {
+      let cell = document.createElement("div"); cell.className = "hex-cell";
+      let xPos = x * xSpacing; let yPos = y * ySpacing;
+      if (x % 2 === 1) yPos += ySpacing / 2;
+      cell.style.left = `${xPos}px`; cell.style.top = `${yPos}px`;
+      cell.setAttribute("data-coord", `${x},${y}`);
+
+      let inner = document.createElement("div"); inner.className = "hex-inner";
+      let u = units.find(v => v.x === x && v.y === y);
+      if (u) {
+        let badge = document.createElement("div"); badge.className = `unit-badge unit-side-${u.side}`;
+        badge.innerText = `${u.name}\nHP: ${u.hp}/${u.maxHp}`;
+        inner.appendChild(badge);
+        if (selectedCardIndex !== null && u.side === "B") cell.classList.add("valid-target");
+      }
+      cell.appendChild(inner); cell.onclick = () => handleCellClick(x, y); mapDiv.appendChild(cell);
+    }
+  }
+  setTimeout(drawTargetLines, 50);
+}
+
+function renderHand() {
+  const container = document.getElementById("hand-container"); container.innerHTML = "";
+  hand.forEach((card, idx) => {
+    let cardDiv = document.createElement("div"); cardDiv.className = "game-card";
+    if (selectedCardIndex === idx) cardDiv.classList.add("active-card");
+    cardDiv.style.borderTop = `3px solid ${card.color}`;
+    cardDiv.style.animationDelay = `${idx * 0.08}s`;
+    cardDiv.onclick = () => {
+      if (currentCommand < card.cost) { logMessage("光が足りません！"); return; }
+      selectedCardIndex = (selectedCardIndex === idx) ? null : idx; drawMap();
+    };
+    cardDiv.innerHTML = `<div class="card-cost">${card.cost}</div><div class="card-title" style="color:${card.isFurioso?'#ff1744':'#fff'}">${card.title}</div><div class="card-desc">${card.desc}</div>`;
+    container.appendChild(cardDiv);
+  });
+}
+
+function handleCellClick(x, y) {
+  if (selectedCardIndex === null) return;
+  let card = hand[selectedCardIndex];
+  let userUnit = units.find(v => v.name === card.user);
+  let targetUnit = units.find(v => v.x === x && v.y === y && v.side === "B");
+  if (targetUnit && Math.max(Math.abs(userUnit.x - x), Math.abs(userUnit.y - y)) <= card.range) {
+    userUnit.target = targetUnit.id; userUnit.card = card; targetUnit.target = userUnit.id;
+    currentCommand -= card.cost; hand.splice(selectedCardIndex, 1); selectedCardIndex = null;
+    document.getElementById("command-val").innerText = `${currentCommand} / 4`;
+    renderHand(); drawMap();
+  }
+}
+
+function drawTargetLines() {
+  const svg = document.getElementById("arrow-svg"); svg.innerHTML = "";
+  const mapRect = document.getElementById("hex-map").getBoundingClientRect();
+  units.forEach(u => {
+    if (u.target) {
+      let targetUnit = units.find(t => t.id === u.target); if (!targetUnit) return;
+      let srcCell = document.querySelector(`[data-coord='${u.x},${u.y}']`);
+      let dstCell = document.querySelector(`[data-coord='${targetUnit.x},${targetUnit.y}']`);
+      if (!srcCell || !dstCell) return;
+      let srcRect = srcCell.getBoundingClientRect(); let dstRect = dstCell.getBoundingClientRect();
+      let x1 = (srcRect.left + srcRect.width/2) - mapRect.left; let y1 = (srcRect.top + srcRect.height/2) - mapRect.top;
+      let x2 = (dstRect.left + dstRect.width/2) - mapRect.left; let y2 = (dstRect.top + dstRect.height/2) - mapRect.top;
+      let cx = (x1 + x2) / 2; let cy = Math.min(y1, y2) - (u.side === "A" ? 30 : -30);
+      let defs = svg.querySelector("defs") || document.createElementNS("http://www.w3.org/2000/svg", "defs");
+      defs.innerHTML = `<marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 1 L 10 5 L 0 9 z" fill="${u.side==='A'?'#3182ce':'#ff1744'}"/></marker>`;
+      svg.appendChild(defs);
+      let path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", `M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`);
+      path.setAttribute("stroke", u.side === "A" ? "#3182ce" : "#ff1744"); path.setAttribute("stroke-width", "3"); path.setAttribute("fill", "none"); path.setAttribute("marker-end", "url(#arrow)");
+      svg.appendChild(path);
+    }
+  });
+}
+
+function startBattlePhase() {
+  activeMatches = [];
+  units.forEach(u => {
+    if (u.side === "A" && u.target) {
+      let enemy = units.find(e => e.id === u.target);
+      if (enemy && enemy.target === u.id) activeMatches.push({ p: u, e: enemy, type: "clash" });
+      else if (enemy) activeMatches.push({ p: u, e: enemy, type: "one-sided" });
+    }
+  });
+  units.forEach(u => {
+    if (u.side === "B" && u.target) {
+      let targetUnit = units.find(a => a.id === u.target);
+      if (targetUnit && !targetUnit.target) activeMatches.push({ p: targetUnit, e: u, type: "one-sided-enemy" });
+    }
+  });
+  if (activeMatches.length === 0) { endTurnAll(); return; }
+  showClashWindow();
+}
+
+function showClashWindow() {
+  let match = activeMatches[0];
+  document.getElementById("clash-p-name").innerText = match.p.name;
+  document.getElementById("clash-e-name").innerText = match.e.name;
+  
+  if (match.p.card && match.p.card.isFurioso) {
+    document.getElementById("clash-type-title").innerText = "★ SPECIAL CLASH ★";
+    document.getElementById("clash-p-card-title").innerText = "Furioso (特異9連撃)";
+    document.getElementById("clash-p-card-desc").innerText = match.p.card.desc;
+  } else if (match.type === "clash") {
+    document.getElementById("clash-type-title").innerText = "MATCH CLASH !!";
+    document.getElementById("clash-p-card-title").innerText = `${match.p.card.title} [${match.p.card.minDice}-${match.p.card.maxDice}]`;
+    document.getElementById("clash-p-card-desc").innerText = match.p.card.desc;
+  } else {
+    document.getElementById("clash-type-title").innerText = "ONE-SIDED !!";
+    document.getElementById("clash-p-card-title").innerText = "(無防備)";
+    document.getElementById("clash-p-card-desc").innerText = "";
+  }
+  document.getElementById("clash-e-card-title").innerText = `${match.e.card.title} [${match.e.card.minDice}-${match.e.card.maxDice}]`;
+  document.getElementById("clash-e-card-desc").innerText = match.e.card.desc || "";
+  document.getElementById("p-dice").innerText = "-"; document.getElementById("e-dice").innerText = "-";
+  document.getElementById("clash-action-btn").style.display = "block";
+  document.getElementById("clash-overlay").style.display = "flex";
+}
+
+function resolveMatch() {
+  let match = activeMatches[0];
+  document.getElementById("clash-action-btn").style.display = "none";
+
+  let pDiceEl = document.getElementById("p-dice");
+  let eDiceEl = document.getElementById("e-dice");
+  let winEl = document.getElementById("clash-window-element");
+  let flashEl = document.getElementById("clash-flash-element");
+  let cutin = document.getElementById("furioso-cutin");
+
+  if (match.p.card && match.p.card.isFurioso) {
+    cutin.classList.add("show");
+    logMessage(`「すべての武器を取り出す。これが最後の記憶だ」`, "#ff1744");
+
+    setTimeout(() => {
+      cutin.classList.remove("show");
+      winEl.classList.add("shake");
+      
+      let strikeCount = 0;
+      
+      let furiosoTimer = setInterval(() => {
+        strikeCount++;
+        let pRoll = Math.floor(Math.random() * (match.p.card.maxDice - match.p.card.minDice + 1)) + match.p.card.minDice;
+        let eRoll = Math.floor(Math.random() * (match.e.card.maxDice - match.e.card.minDice + 1)) + match.e.card.minDice;
+        
+        pDiceEl.innerHTML = `<span style="font-size:12px;color:#888;">#${strikeCount}</span> ${pRoll}`;
+        eDiceEl.innerText = eRoll;
+        
+        flashEl.className = "clash-flash flash-furioso";
+        void flashEl.offsetWidth; 
+        flashEl.classList.add("flash-furioso");
+
+        if (pRoll >= eRoll) {
+          match.e.hp -= pRoll;
+          logMessage(` Furioso 連撃 #${strikeCount}: [勝利] ${pRoll} ダメージ！`, "#00e5ff");
+        } else {
+          match.p.hp -= eRoll;
+          logMessage(` Furioso 連撃 #${strikeCount}: [相殺失敗] 反撃で ${eRoll} ダメージを受ける！`, "#ff4d4d");
+        }
+
+        if (strikeCount >= 9 || match.e.hp <= 0) {
+          clearInterval(furiosoTimer);
+          setTimeout(() => {
+            winEl.classList.remove("shake");
+            document.getElementById("clash-overlay").style.display = "none";
+            finalizeMatchResult(match);
+          }, 600);
+        }
+      }, 180);
+    }, 1000);
+
+    return;
+  }
+
+  let rollInterval = setInterval(() => {
+    if (match.type === "clash") {
+      pDiceEl.innerText = Math.floor(Math.random() * (match.p.card.maxDice - match.p.card.minDice + 1)) + match.p.card.minDice;
+    } else {
+      pDiceEl.innerText = "X";
+    }
+    eDiceEl.innerText = Math.floor(Math.random() * (match.e.card.maxDice - match.e.card.minDice + 1)) + match.e.card.minDice;
+  }, 50);
+
+  setTimeout(() => {
+    clearInterval(rollInterval);
+
+    let pRoll = match.type === "clash" ? Math.floor(Math.random() * (match.p.card.maxDice - match.p.card.minDice + 1)) + match.p.card.minDice : 0;
+    let eRoll = Math.floor(Math.random() * (match.e.card.maxDice - match.e.card.minDice + 1)) + match.e.card.minDice;
+    pDiceEl.innerText = match.type === "clash" ? pRoll : "X"; 
+    eDiceEl.innerText = eRoll;
+
+    winEl.classList.remove("shake");
+    flashEl.className = "clash-flash";
+
+    setTimeout(() => {
+      winEl.classList.add("shake");
+
+      if (match.type === "clash") {
+        if (pRoll > eRoll) { 
+          match.e.hp -= pRoll; 
+          flashEl.classList.add("flash-win");
+          logMessage(`[勝利] ${match.p.name} が勝利！ ${match.e.name} に ${pRoll} ダメージ。`, "#3182ce"); 
+        } else if (eRoll > pRoll) { 
+          match.p.hp -= eRoll; 
+          flashEl.classList.add("flash-lose");
+          logMessage(`[敗北] ${match.p.name} が敗北。 ${eRoll} ダメージ。`, "#e53e3e"); 
+        } else {
+          logMessage(`[相殺] 互いの攻撃が激突し、霧散した。`);
+        }
+      } else { 
+        match.p.hp -= eRoll; 
+        flashEl.classList.add("flash-lose");
+        logMessage(`[不意打] ${match.e.name} の攻撃！ ${match.p.name} に ${eRoll} ダメージ。`, "#e53e3e"); 
+      }
+      
+      setTimeout(() => {
+        document.getElementById("clash-overlay").style.display = "none";
+        winEl.classList.remove("shake");
+        finalizeMatchResult(match);
+      }, 1000);
+
+    }, 200);
+  }, 600);
+}
+
+function finalizeMatchResult(match) {
+  if (match.e.hp <= 0) {
+    units = units.filter(u => u.id !== match.e.id);
+    if (match.e.id === "BOSS" && currentStage === 10) {
+      let furiosoCard = rewardPool.find(c => c.isFurioso);
+      playerDeck.push(JSON.parse(JSON.stringify(furiosoCard)));
+      alert(`【第10層ボス撃破報酬】\n黒い沈悶の大技「Furioso」を修得し、デッキに組み込みました！`);
+    }
+  }
+  if (match.p.hp <= 0) units = units.filter(u => u.id !== match.p.id);
+  
+  activeMatches.shift();
+  if (activeMatches.length > 0) showClashWindow(); else endTurnAll();
+}
+
+function endTurnAll() {
+  if (!units.some(u => u.side === "A")) {
+    alert(`作戦終了。第 ${currentStage} 層で全滅しました。`);
+    document.getElementById("home-screen").style.display = "flex"; updateHomeUI(); return;
+  }
+  if (!units.some(u => u.side === "B")) {
+    showRewardWindow(); return;
+  }
+  units.forEach(u => { u.target = null; u.card = null; }); startPlayerTurn();
+}
+
+function showRewardWindow() {
+  const container = document.getElementById("reward-cards-container"); container.innerHTML = "";
+  let selection = [];
+  while(selection.length < 3) {
+    let r = rewardPool[Math.floor(Math.random() * rewardPool.length)];
+    if(!selection.includes(r)) selection.push(r);
+  }
+  selection.forEach((card, idx) => {
+    let cardDiv = document.createElement("div"); cardDiv.className = "game-card";
+    cardDiv.style.borderTop = `3px solid ${card.color}`;
+    cardDiv.style.animationDelay = `${idx * 0.1}s`;
+    cardDiv.innerHTML = `<div class="card-cost">${card.cost}</div><div class="card-title" style="color:${card.isFurioso?'#ff1744':'#fff'}">${card.title}</div><div class="card-desc">${card.desc}</div>`;
+    cardDiv.onclick = () => {
+      playerDeck.push(card); document.getElementById("reward-overlay").style.display = "none";
+      initStage(currentStage + 1);
+    };
+    container.appendChild(cardDiv);
+  });
+  document.getElementById("reward-overlay").style.display = "flex";
+}
+
+function openDeckPreview() {
+  const container = document.getElementById("deck-grid-container"); container.innerHTML = "";
+  let targetDeck = playerDeck.length > 0 ? playerDeck : baseDeck;
+  targetDeck.forEach((card, idx) => {
+    let cardDiv = document.createElement("div"); cardDiv.className = "game-card";
+    cardDiv.style.borderTop = `3px solid ${card.color}`;
+    cardDiv.style.animationDelay = `${idx * 0.03}s`;
+    cardDiv.innerHTML = `<div class="card-cost">${card.cost}</div><div class="card-title" style="color:${card.isFurioso?'#ff1744':'#fff'}">${card.title}</div><div class="card-desc">${card.desc}</div>`;
+    container.appendChild(cardDiv);
+  });
+  document.getElementById("deck-preview-overlay").style.display = "flex";
+}
+function closeDeckPreview() { document.getElementById("deck-preview-overlay").style.display = "none"; }
+function logMessage(msg, color = "#a0aec0") {
+  const log = document.getElementById("log-panel"); const div = document.createElement("div"); div.innerText = msg; div.style.color = color; log.appendChild(div); log.scrollTop = log.scrollHeight;
+}
+updateHomeUI();
+</script>
+</body>
+</html>
